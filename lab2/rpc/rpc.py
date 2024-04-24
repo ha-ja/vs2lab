@@ -1,5 +1,4 @@
 import constRPC
-import threading
 import time
 from context import lab_channel
 
@@ -18,7 +17,7 @@ class Client:
         self.chan = lab_channel.Channel()
         self.client = self.chan.join('client')
         self.server = None
-        self.response = None
+        self.dataRecieved = False
 
     def run(self):
         self.chan.bind(self.client)
@@ -27,7 +26,7 @@ class Client:
     def stop(self):
         self.chan.leave('client')
 
-    def append(self, data, db_list, callback):
+    def append(self, data, db_list):
         assert isinstance(db_list, DBList)
         msglst = (constRPC.APPEND, data, db_list)  # message payload
         self.chan.send_to(self.server, msglst)  # send msg to server
@@ -35,23 +34,15 @@ class Client:
             msgrcv = self.chan.receive_from(self.server)
             if msgrcv[1] == "ACK":
                 print("Recieved Ack")
-                waitthread = threading.Thread(target=self.awaitResponse, args=(callback,))
-                waitthread.start()
                 break;
-        while self.response is None:
-            time.sleep(1)
-            print("doing other things")
-        waitthread.join()
-        return self.response
 
     def awaitResponse(self, callback):
         print("started waiting for response")
         while True:
             msgrcv = self.chan.receive_from(self.server)
-            if msgrcv[1] != "ACK":
-                print("Recieved data different than ack")
+            if msgrcv is not None:
+                self.dataRecieved = True
                 callback(msgrcv[1])
-                self.response = msgrcv[1]
                 break;
 
 class Server:
