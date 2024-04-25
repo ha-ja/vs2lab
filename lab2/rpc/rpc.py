@@ -72,6 +72,10 @@ class Server:
                     self.chan.send_to({client}, "ACK")
                     time.sleep(10)  
                     result = self.append(msgrpc[1], msgrpc[2])
+                    print("Got request from client")
+                    self.chan.send_to({client}, "ACK")
+                    time.sleep(10)  
+                    result = self.append(msgrpc[1], msgrpc[2])
                     self.chan.send_to({client}, result)  # return response
                 else:
                     pass  # unsupported request, simply ignore
