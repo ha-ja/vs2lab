@@ -1,6 +1,5 @@
 import rpc
 import logging
-import threading
 import time
 
 from context import lab_logging
@@ -13,18 +12,13 @@ cl.run()
 def callback(data):
   print("ResultCallback: {}".format(data.value))
 
-waitthread = threading.Thread(target=cl.awaitResponse, args=(callback,))
 
 base_list = rpc.DBList({'foo'})
-cl.append('bar', base_list)
-waitthread.start()
+cl.append('bar', base_list, callback)
 
-
-while cl.dataRecieved == False:
-  print("Do other things.")
+while cl.response is None:
+  print("doing other things")
   time.sleep(1)
 
-
-waitthread.join()
 
 cl.stop()
