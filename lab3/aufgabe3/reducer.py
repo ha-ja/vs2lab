@@ -13,10 +13,9 @@ address1 = "tcp://" + src + ":" + prt  # how and where to connect
 
 context = zmq.Context()
 reply_socket = context.socket(zmq.REP)  # create reply socket
- 
 reply_socket.bind(address1)  # bind socket to address
 
-sumWords = {}
+sumWords = {} #create dictionary of words
 
 while True:
     message = reply_socket.recv()  # wait for incoming message

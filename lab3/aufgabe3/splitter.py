@@ -22,5 +22,5 @@ time.sleep(1) # wait to allow all clients to connect
 with open('file.txt', 'r') as file:
     lines = file.readlines()
     for line in lines:
-        push_socket.send(pickle.dumps((me, line)))  # send workload to worker
+        push_socket.send(pickle.dumps((me, line)))  # send workload to mapper
     
