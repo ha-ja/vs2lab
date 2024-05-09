@@ -20,7 +20,8 @@ time.sleep(1)
 
 print("{} started".format(me))
 
+counter = 0
 while True:
     work = pickle.loads(pull_socket.recv())  # receive work from a source
-    print("{} received workload {} from {}".format(me, work[1], work[0]))
-    time.sleep(work[1] * 0.01)  # pretend to work
+    print(counter, "{} received workload {} from {}".format(me, work[1], work[0]))
+    counter += 1
