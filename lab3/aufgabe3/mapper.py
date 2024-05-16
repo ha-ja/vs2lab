@@ -36,7 +36,7 @@ while True:
 
     translator = str.maketrans('', '', string.punctuation)
     cleaned_sentence = work[1].translate(translator)
-
+    print("Sent {}. request".format(cleaned_sentence))  # print ack
     for index, word in enumerate(cleaned_sentence.split()):
       if index % 2 == 0:
         requester1.send_string(word)  # send message and go on
