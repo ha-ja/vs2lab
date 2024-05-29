@@ -104,13 +104,17 @@ class ChordNode:
         :return: located node name
         """
         if self.in_between(key, self.finger_table[0] + 1, self.node_id + 1):  # key in (FT[0],self]
+            # print("Case 1: Node: {} Key: {} between {} and {}. Returning {} \n".format(self.node_id, key, self.finger_table[0] + 1, self.node_id + 1, self.node_id))
             return self.node_id  # node is responsible
         elif self.in_between(key, self.node_id + 1, self.finger_table[1]):  # key in (self,FT[1]]
+            # print("Case 2: Node: {} Key: {} between {} and {}. Returning {} \n".format(self.node_id, key, self.node_id + 1, self.finger_table[1], self.finger_table[1]))
             return self.finger_table[1]  # successor responsible
         for i in range(1, self.n_bits):  # go through rest of FT
             if self.in_between(key, self.finger_table[i], self.finger_table[(i + 1) ]):
+                # print("Case 3: Node: {} Key: {} between {} and {}. Returning {} \n".format(self.node_id, key,self.finger_table[i], self.finger_table[(i + 1)], self.finger_table[i]))
                 return self.finger_table[i]  # key in [FT[i],FT[i+1])
         if self.in_between(key, self.finger_table[-1], self.finger_table[0] + 1): # key outside FT
+            # print("Case 4: Node: {} Key: {} between {} and {}. Returning {} \n".format(self.node_id, key,self.finger_table[-1], self.finger_table[0] + 1, self.finger_table[-1]))
             return self.finger_table[-1]  # key in [FT[-1],FT[0]]
         assert False # we cannot be here
 
@@ -150,9 +154,17 @@ class ChordNode:
                 self.logger.info("Node {:04n} received LOOKUP {:04n} from {:04n}."
                                  .format(self.node_id, int(request[1]), int(sender)))
 
-                # look up and return local successor 
+                # look up and return local successor
                 next_id: int = self.local_successor_node(request[1])
-                self.channel.send_to([sender], (constChord.LOOKUP_REP, next_id))
+                if next_id == self.node_id:
+                    self.channel.send_to([sender], (constChord.LOOKUP_REP, next_id))
+                else:
+                    # Recursive call and wait for an answer
+                    self.logger.info("Forwarding lookup request from node {} to node {}.".format(int(sender), next_id))
+                    self.channel.send_to([str(next_id)], (constChord.LOOKUP_REQ, request[1]))
+                    reply = self.channel.receive_from([str( next_id )])
+                    print("Sending request back to {} with key: {} from node :{}".format(sender, request[1], self.node_id))
+                    self.channel.send_to([sender], reply[1])
 
                 # Finally do a sanity check
                 if not self.channel.exists(next_id):  # probe for existence
