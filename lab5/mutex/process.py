@@ -40,6 +40,7 @@ class Process:
         self.queue = []  # The request queue list
         self.clock = 0  # The current logical clock
         self.logger = logging.getLogger("vs2lab.lab5.mutex.process.Process")
+        self.failed_processes = set()  # Track failed processes
 
     def __mapid(self, id='-1'):
         # resolve channel member address to a human friendly identifier
@@ -118,6 +119,28 @@ class Process:
             self.__cleanup_queue()  # Finally sort and cleanup the queue
         else:        
             self.logger.warning("{} timed out on RECEIVE.".format(self.__mapid()))
+        # Check for failed process
+            # Prüft ob self.queue nicht leer ist und ob der Prozess an erster stelle als ausgefallen markiert wurde
+            if self.queue and self.queue[0][1] not in self.failed_processes:
+                # Fügt den ausgefallen Prozess zur Liste hinzu
+                failed_process = self.queue[0][1]
+                self.failed_processes.add(failed_process)
+                # Loggt eine Warnung mit dem ausgefallenen Prozess
+                self.logger.warning("Detected failure of process: {}".format(self.__mapid(failed_process)))
+                # Ruft Funktion zum entfernen des ausgefallenen aus der queue und aus der Liste der anderen Prozesse (self.other_processes)
+                self.__remove_failed_process(failed_process)
+
+    def __remove_failed_process(self, failed_process):
+        """
+        Remove a failed process from the queue and other processes list.
+        """
+        # Entfernt den ausgefallen Prozess aus der queue
+        self.queue = [msg for msg in self.queue if msg[1] != failed_process]
+        # Entfernt den ausgefallen Prozess aus der Liste der anderen Prozesse
+        if failed_process in self.other_processes:
+            self.other_processes.remove(failed_process)
+        # Loggt das der ausgefallene Prozess entfernt wurde.
+        self.logger.info("Removed failed process: {}".format(self.__mapid(failed_process)))  
 
     def init(self):
         self.channel.bind(self.process_id)
