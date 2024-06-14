@@ -76,7 +76,31 @@ if __name__ == "__main__":  # if script is started from command line
     proc_to_crash.terminate()
     proc_to_crash.join()
 
+    proc_id1 = random.randint(0, len(children) - 1)
+    proc_to_crash1 = children[proc_id1]
+    del(children[proc_id1])    
+
+    proc_to_crash1.terminate()
+    proc_to_crash1.join()
+
+    proc_id2 = random.randint(0, len(children) - 1)
+    proc_to_crash2 = children[proc_id1]
+    del(children[proc_id2])    
+
+    proc_to_crash2.terminate()
+    proc_to_crash2.join()
+
+    proc_id3 = random.randint(0, len(children) - 1)
+    proc_to_crash3 = children[proc_id3]
+    del(children[proc_id3])    
+
+    proc_to_crash3.terminate()
+    proc_to_crash3.join()
+
     logger.warning("A process has crashed: {}".format(proc_to_crash))
+    logger.warning("A process has crashed: {}".format(proc_to_crash1))
+    logger.warning("A process has crashed: {}".format(proc_to_crash2))
+    logger.warning("A process has crashed: {}".format(proc_to_crash3))
 
     # wait for peer procs to finish
     for peer_proc in children:

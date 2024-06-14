@@ -99,7 +99,7 @@ class Process:
 
     def __receive(self):
          # Pick up any message
-        _receive = self.channel.receive_from(self.other_processes, 10) 
+        _receive = self.channel.receive_from(self.other_processes, 5) 
         if _receive:
             msg = _receive[1]
 
@@ -135,24 +135,37 @@ class Process:
             self.__cleanup_queue()  # Finally sort and cleanup the queue
         else:        
             self.logger.warning("{} timed out on RECEIVE.".format(self.__mapid()))
-            print("QUEUE: ", self.queue)
-            num = 0
-            #if self.queue[0][2] == '1' and self.queue[0][1] == self.process_id:
-            for mes in self.queue:
-                if mes[2] == '2':
-                    num += 1
-            if num == 2:
-                self.working_processes = [entry[1] for entry in self.queue if entry[2] == '2']
-                self.working_processes.append(self.process_id)
+            if self.timeout_count == 0 and self.queue[0][2] == '1' and self.queue[0][1] == self.process_id:
+                working_processes = [entry[1] for entry in self.queue if entry[2] == '2']
+                working_processes.append(self.process_id)
                 failed_process = ""
                 for process in self.all_processes:
                     if process not in self.working_processes:
                         failed_process = str(process)
-                print("Failed:", failed_process)
                 self.logger.warning("Detected failure of process: {}".format(self.__mapid(failed_process)))
                 self.__remove_failed_process(failed_process)
-            if num == 3:
-                self.__remove_failed_process(self.queue[0][1])
+                if failed_process in self.other_processes:
+                    self.other_processes.remove(failed_process)
+                # Entfernt den ausgefallen Prozess aus der queue
+                self.queue = [item for item in self.queue if item[1] != failed_process]
+                # Loggt das der ausgefallene Prozess entfernt wurde.
+                self.logger.info("Removed failed process: {}".format(self.__mapid(failed_process)))
+                self.__cleanup_queue()  # Finally sort and cleanup the queue
+                self.timeout_count = 0
+            if self.timeout_count < len(self.queue) and self.timeout_count > 0 and self.queue[self.timeout_count][1] == self.process_id:
+                failed_process = self.queue[0][1]
+                self.logger.warning("Detected failure of process: {}".format(self.__mapid(failed_process)))
+                self.__remove_failed_process(failed_process)
+                # Entfernt den ausgefallen Prozess aus der Liste der anderen Prozesse
+                if failed_process in self.other_processes:
+                    self.other_processes.remove(failed_process)
+                # Entfernt den ausgefallen Prozess aus der queue
+                self.queue = [item for item in self.queue if item[1] != failed_process]
+                # Loggt das der ausgefallene Prozess entfernt wurde.
+                self.logger.info("Removed failed process: {}".format(self.__mapid(failed_process)))
+                self.__cleanup_queue()  # Finally sort and cleanup the queue
+                self.timeout_count = 0
+            self.timeout_count += 1
 
     def init(self):
         self.channel.bind(self.process_id)
