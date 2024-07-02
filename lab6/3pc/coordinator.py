@@ -50,7 +50,7 @@ class Coordinator:
         self.channel.send_to(self.participants, VOTE_REQUEST)
 
         # if random.random() > 2/3:  # simulate a crash
-        #     return "Coordinator crashed in state WAIT."
+            # return "Coordinator crashed in state WAIT."
 
         # Collect votes from all participants
         yet_to_receive = list(self.participants)
@@ -60,6 +60,12 @@ class Coordinator:
             if (not msg) or (msg[1] == VOTE_ABORT):
                 reason = "timeout" if not msg else "local_abort from " + msg[0]
                 self._enter_state('ABORT')
+
+
+                # if random.random() > 2/3:  # simulate a crash
+                    # return "Coordinator crashed in state ABORT."
+                
+
                 # Inform all participants about global abort
                 self.channel.send_to(self.participants, GLOBAL_ABORT)
                 return "Coordinator {} terminated in state ABORT. Reason: {}."\
@@ -74,11 +80,9 @@ class Coordinator:
         self._enter_state('PRECOMMIT')
         self.channel.send_to(self.participants, PREPARE_COMMIT)
 
-
         # if random.random() > 2/3:  # simulate a crash
-        #     return "Coordinator crashed in state PREPARE_COMMIT."
+            # return "Coordinator crashed in state PREPARE_COMMIT."
         
-
         # Collect votes from all participants
         yet_to_receive = list(self.participants)
         while len(yet_to_receive) > 0:

@@ -6,7 +6,7 @@ from const3PC import PREPARE_COMMIT, VOTE_REQUEST, GLOBAL_COMMIT, GLOBAL_ABORT
 # participant decissions
 from const3PC import LOCAL_SUCCESS, LOCAL_ABORT
 # participant messages
-from const3PC import READY_COMMIT, VOTE_COMMIT, VOTE_ABORT, NEED_DECISION
+from const3PC import READY_COMMIT, VOTE_COMMIT, VOTE_ABORT
 # misc constants
 from const3PC import TIMEOUT
 
@@ -60,22 +60,18 @@ class Participant:
 
         else:  # Coordinator requested to vote, joint commit starts
             assert msg[1] == VOTE_REQUEST
-
             # Firstly, come to a local decision
             decision = self._do_work()  # proceed with local activities
-            
             # If local decision is negative,
             # then vote for abort and quit directly
             if decision == LOCAL_ABORT:
                 self.channel.send_to(self.coordinator, VOTE_ABORT)
-
             # If local decision is positive,
             # we are ready to proceed the joint commit
             else:
                 assert decision == LOCAL_SUCCESS
                 self._enter_state('READY')
-
-
+                
                 # if self.participant == min(self.all_participants):  # simulate a crash
                 #     return "Participant {} crashed in state READY after VOTE_REQUEST.".format(self.participant)
                 
@@ -91,17 +87,17 @@ class Participant:
                     min_id = min(self.all_participants)
                     self.coordinator = {min_id}
                     if self.participant == min_id:
-                        self.logger.info("Participant {} is the new Coordinator."
-                            .format(self.participant))
-                        self._enter_state('ABORT')
-                        # Inform all participants about global abort
-                        self.channel.send_to(self.all_participants, GLOBAL_ABORT)
-                        return "Participant {} terminated in state {} due to Coordinator Crash.".format(
-                            self.participant, self.state)
+                        decision = self.coordinator_work()
+                        return "Coordinator {} terminated in state {} due to {}.".format(
+                            self.participant, self.state, decision)
                     else:
-                        msg = self.channel.receive_from(self.coordinator, TIMEOUT * 2)
-                        if msg:
+                        self.help_coordinator()
+                        if decision != LOCAL_ABORT:
+                            msg = self.channel.receive_from(self.coordinator, TIMEOUT * 2)
                             decision = msg[1]
+                        else:
+                            return "Coordinator {} terminated in state {} due to {}.".format(
+                                self.participant, self.state, decision)
                 else:  # Coordinator came to a decision
                     decision = msg[1]
 
@@ -112,28 +108,26 @@ class Participant:
             self._enter_state('PRECOMMIT')
             self.channel.send_to(self.coordinator, READY_COMMIT)
         elif decision == GLOBAL_ABORT:
-            self._enter_state('ABORT')
+            if self.state != 'ABORT':
+                self._enter_state('ABORT')
             return "Participant {} terminated in state {} due to {}.".format(
                 self.participant, self.state, decision)
         else:
-            self._enter_state('ABORT')
+            if self.state != 'ABORT':
+                self._enter_state('ABORT')
             msg = self.channel.receive_from(self.coordinator, TIMEOUT)
             if not msg:  # Crashed coordinator
                 min_id = min(self.all_participants)
                 self.coordinator = {min_id}
                 if self.participant == min_id:
-                    self.logger.info("Participant {} is the new Coordinator."
-                        .format(self.participant))
-                    # Inform all participants about global abort
-                    self.channel.send_to(self.all_participants, GLOBAL_ABORT)
-                    return "Participant {} terminated in state {} due to Coordinator Crash.".format(
-                        self.participant, self.state)
-                else:
-                    msg = self.channel.receive_from(self.coordinator, TIMEOUT)
-                    if msg and decision != LOCAL_ABORT:
-                        decision = msg[1]
-                    return "Participant {} terminated in state {} due to {}.".format(
+                    decision = self.coordinator_work()
+                    return "Coordinator {} terminated in state {} due to {}.".format(
                         self.participant, self.state, decision)
+                else:
+                    self.help_coordinator()
+                    if decision != LOCAL_ABORT:
+                        msg = self.channel.receive_from(self.coordinator, TIMEOUT * 2)
+                        decision = msg[1]
             else:
                 return "Participant {} terminated in state {} due to {}.".format(
                         self.participant, self.state, decision)
@@ -144,15 +138,13 @@ class Participant:
             min_id = min(self.all_participants)
             self.coordinator = {min_id}
             if self.participant == min_id:
-                self.logger.info("Participant {} is the new Coordinator."
-                        .format(self.participant))
-                self._enter_state('COMMIT')
-                self.channel.send_to(self.all_participants, GLOBAL_COMMIT)
-                return "Participant {} terminated in state {} due to Coordinator Crash.".format(
-                    self.participant, self.state)
+                decision = self.coordinator_work()
+                return "Coordinator {} terminated in state {} due to {}.".format(
+                    self.participant, self.state, decision)
             else:
-                msg = self.channel.receive_from(self.coordinator, TIMEOUT)
-                if msg:
+                self.help_coordinator()
+                if decision != LOCAL_ABORT:
+                    msg = self.channel.receive_from(self.coordinator, TIMEOUT * 2)
                     decision = msg[1]
         else:  # Coordinator came to a decision
             decision = msg[1]
@@ -161,7 +153,47 @@ class Participant:
             self._enter_state('COMMIT')
         else:
             assert decision in [GLOBAL_ABORT, LOCAL_ABORT]
-            self._enter_state('ABORT')
+            if self.state != 'ABORT':
+                self._enter_state('ABORT')
 
         return "Participant {} terminated in state {} due to {}.".format(
             self.participant, self.state, decision)
+
+    def coordinator_work(self):
+        self.logger.info("Participant {} is the new Coordinator."
+            .format(self.participant))
+        if self.state == 'READY':
+            self._enter_state('WAIT')
+            # Inform all participants about own state
+            self.channel.send_to(self.all_participants, 'WAIT')
+            self._enter_state('ABORT')
+            self.channel.send_to(self.all_participants, GLOBAL_ABORT)
+            return GLOBAL_ABORT
+        elif self.state == 'PRECOMMIT':
+            # Inform all participants about own state
+            self.channel.send_to(self.all_participants, 'PRECOMMIT')
+            self._enter_state('COMMIT')
+            self.channel.send_to(self.all_participants, GLOBAL_COMMIT)
+            return GLOBAL_COMMIT
+        elif self.state == 'ABORT':
+            # Inform all participants about own state
+            self.channel.send_to(self.all_participants, 'ABORT')
+            self._enter_state('ABORT')
+            self.channel.send_to(self.all_participants, GLOBAL_ABORT)
+            return GLOBAL_ABORT
+        else:
+            # Inform all participants about own state
+            self.channel.send_to(self.all_participants, 'COMMIT')
+            self.channel.send_to(self.all_participants, GLOBAL_COMMIT)
+            return GLOBAL_COMMIT
+
+    def help_coordinator(self):
+        msg = self.channel.receive_from(self.coordinator, TIMEOUT * 2)
+        if msg[1] == 'WAIT' and self.state == 'INIT':
+            self._enter_state('READY')
+        elif msg[1] == 'PRECOMMIT' and self.state == 'READY':
+            self._enter_state('PRECOMMIT')
+        elif msg[1] == 'COMMIT':
+            self._enter_state('COMMIT')
+        elif msg[1] == 'ABORT':
+            self._enter_state('ABORT')
