@@ -43,7 +43,7 @@ class Coordinator:
 
     def run(self):
         # if random.random() > 3/4:  # simulate a crash
-        #     return "Coordinator crashed in state INIT."
+            # return "Coordinator crashed in state INIT."
 
         # Request local votes from all participants
         self._enter_state('WAIT')
@@ -55,7 +55,7 @@ class Coordinator:
         # Collect votes from all participants
         yet_to_receive = list(self.participants)
         while len(yet_to_receive) > 0:
-            msg = self.channel.receive_from(self.participants, TIMEOUT)
+            msg = self.channel.receive_from(self.participants)
 
             if (not msg) or (msg[1] == VOTE_ABORT):
                 reason = "timeout" if not msg else "local_abort from " + msg[0]
@@ -103,7 +103,7 @@ class Coordinator:
         self._enter_state('COMMIT')
         
         # if random.random() > 2/3:  # simulate a crash
-        #     return "Coordinator crashed in state COMMIT."
+            # return "Coordinator crashed in state COMMIT."
 
         # Inform all participants about global commit
         self.channel.send_to(self.participants, GLOBAL_COMMIT)

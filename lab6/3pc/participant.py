@@ -61,19 +61,20 @@ class Participant:
         else:  # Coordinator requested to vote, joint commit starts
             assert msg[1] == VOTE_REQUEST
             # Firstly, come to a local decision
+            # if self.participant == min(self.all_participants):  # simulate a crash
+            #     return "Participant {} crashed in state INIT after VOTE_REQUEST.".format(self.participant)
+
             decision = self._do_work()  # proceed with local activities
             # If local decision is negative,
             # then vote for abort and quit directly
             if decision == LOCAL_ABORT:
                 self.channel.send_to(self.coordinator, VOTE_ABORT)
+
             # If local decision is positive,
             # we are ready to proceed the joint commit
             else:
                 assert decision == LOCAL_SUCCESS
                 self._enter_state('READY')
-                
-                # if self.participant == min(self.all_participants):  # simulate a crash
-                #     return "Participant {} crashed in state READY after VOTE_REQUEST.".format(self.participant)
                 
                 # Notify coordinator about local commit vote
                 self.channel.send_to(self.coordinator, VOTE_COMMIT)
@@ -99,7 +100,8 @@ class Participant:
                             return "Coordinator {} terminated in state {} due to {}.".format(
                                 self.participant, self.state, decision)
                 else:  # Coordinator came to a decision
-                    decision = msg[1]
+                    if decision != LOCAL_ABORT:
+                        decision = msg[1]
 
         # Change local state based on the outcome of the joint commit protocol
         # Note: If the protocol has blocked due to coordinator crash,
@@ -147,7 +149,8 @@ class Participant:
                     msg = self.channel.receive_from(self.coordinator, TIMEOUT * 2)
                     decision = msg[1]
         else:  # Coordinator came to a decision
-            decision = msg[1]
+            if decision != LOCAL_ABORT:
+                decision = msg[1]
 
         if decision == GLOBAL_COMMIT:
             self._enter_state('COMMIT')
@@ -166,7 +169,8 @@ class Participant:
             self._enter_state('WAIT')
             # Inform all participants about own state
             self.channel.send_to(self.all_participants, 'WAIT')
-            self._enter_state('ABORT')
+            if self.state != 'ABORT':
+                self._enter_state('ABORT')
             self.channel.send_to(self.all_participants, GLOBAL_ABORT)
             return GLOBAL_ABORT
         elif self.state == 'PRECOMMIT':
@@ -178,7 +182,8 @@ class Participant:
         elif self.state == 'ABORT':
             # Inform all participants about own state
             self.channel.send_to(self.all_participants, 'ABORT')
-            self._enter_state('ABORT')
+            if self.state != 'ABORT':
+                self._enter_state('ABORT')
             self.channel.send_to(self.all_participants, GLOBAL_ABORT)
             return GLOBAL_ABORT
         else:
@@ -193,7 +198,7 @@ class Participant:
             self._enter_state('READY')
         elif msg[1] == 'PRECOMMIT' and self.state == 'READY':
             self._enter_state('PRECOMMIT')
-        elif msg[1] == 'COMMIT':
+        elif msg[1] == 'COMMIT' and self.state != 'COMMIT':
             self._enter_state('COMMIT')
-        elif msg[1] == 'ABORT':
+        elif msg[1] == 'ABORT' and self.state != 'ABORT':
             self._enter_state('ABORT')
